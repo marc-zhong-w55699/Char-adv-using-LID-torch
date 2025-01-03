@@ -1,56 +1,72 @@
 import os
 import gzip
 import numpy as np
-from torchvision import datasets,transforms
-from torch.utils.data import DataLoader
+import torch
+from torchvision import datasets, transforms
+
 class DealDataset():
-    def __init__(self, folder, data_name, label_name,transform=None):
-        (train_set, train_labels) = load_data(folder, data_name, label_name) 
-        self.train_set = train_set
-        self.train_labels = train_labels
+    """
+    Custom dataset class for handling local MNIST data.
+
+    Args:
+        images (numpy.ndarray): Image data.
+        labels (numpy.ndarray): Label data.
+        transform (callable, optional): A function/transform to apply to the images.
+    """
+    def __init__(self, images, labels, transform=None):
+        self.images = images
+        self.labels = labels
         self.transform = transform
 
     def __getitem__(self, index):
-        img, target = self.train_set[index], int(self.train_labels[index])
-        if self.transform is not None:
+        img, target = self.images[index], int(self.labels[index])
+        if self.transform:
             img = self.transform(img)
         return img, target
 
     def __len__(self):
-        return len(self.train_set)
+        return len(self.images)
 
-def load_data(data_folder, data_name, label_name):
-    with gzip.open(os.path.join(data_folder,label_name), 'rb') as lbpath:
-        y_data = np.frombuffer(lbpath.read(), np.uint8, offset=8)
-    with gzip.open(os.path.join(data_folder,data_name), 'rb') as imgpath:
-        x_data = np.frombuffer(
-            imgpath.read(), np.uint8, offset=16).reshape(len(y_data), 28, 28)
-    return (x_data, y_data)
-
-def get_data(data_dir='./data', batch_size=64):
+def convert_to_numpy(dataset):
     """
-    Downloads and loads the MNIST dataset using PyTorch's torchvision library.
+    Converts PyTorch dataset to numpy arrays for images and labels.
 
     Args:
-        data_dir (str): Directory where the MNIST data will be stored.
-        batch_size (int): Batch size for the DataLoader.
+        dataset (torchvision.datasets): The dataset to be converted.
 
     Returns:
-        train_loader (torch.utils.data.DataLoader): DataLoader for training dataset.
-        test_loader (torch.utils.data.DataLoader): DataLoader for testing dataset.
+        tuple: Tuple of numpy arrays (images, labels).
     """
-    # Define transformations
+    images = dataset.data.numpy()
+    labels = dataset.targets.numpy()
+    return images, labels
+
+def get_data(data_dir='./data'):
+    """
+    Downloads MNIST dataset and prepares it for use with DealDataset.
+
+    Args:
+        data_dir (str): Directory to store the MNIST data.
+
+    Returns:
+        tuple: Training and testing datasets as DealDataset instances.
+    """
+    # Define transformation
     transform = transforms.Compose([
-        transforms.ToTensor(),  # Convert PIL image to PyTorch tensor
+        transforms.ToTensor(),  # Convert to PyTorch tensor
         transforms.Normalize((0.5,), (0.5,))  # Normalize to mean 0, variance 1
     ])
-    
-    # Download and load MNIST datasets
-    train_dataset = datasets.MNIST(root=data_dir, train=True, download=True, transform=transform)
-    test_dataset = datasets.MNIST(root=data_dir, train=False, download=True, transform=transform)
 
-    # Create DataLoaders
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
+    # Download MNIST dataset
+    train_dataset = datasets.MNIST(root=data_dir, train=True, download=True, transform=None)
+    test_dataset = datasets.MNIST(root=data_dir, train=False, download=True, transform=None)
 
-    return train_loader, test_loader
+    # Convert PyTorch dataset to numpy arrays
+    train_images, train_labels = convert_to_numpy(train_dataset)
+    test_images, test_labels = convert_to_numpy(test_dataset)
+
+    # Wrap in DealDataset
+    train_data = DealDataset(train_images, train_labels, transform=transform)
+    test_data = DealDataset(test_images, test_labels, transform=transform)
+
+    return train_data, test_data
