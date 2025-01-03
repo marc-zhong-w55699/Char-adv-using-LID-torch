@@ -2,7 +2,7 @@ import os
 import gzip
 import numpy as np
 from torchvision import datasets,transforms
-
+from torch.utils.data import DataLoader
 class DealDataset():
     def __init__(self, folder, data_name, label_name,transform=None):
         (train_set, train_labels) = load_data(folder, data_name, label_name) 
